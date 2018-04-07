@@ -1,0 +1,10 @@
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\bin\Debug\ConsoleApp.exe
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\bin\Debug\ConsoleApp.pdb
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\obj\Debug\Server.csprojResolveAssemblyReference.cache
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\obj\Debug\Server.csproj.CoreCompileInputs.cache
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\obj\Debug\ConsoleApp.exe
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\obj\Debug\ConsoleApp.pdb
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\bin\Debug\ConsoleApp.exe.config
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\bin\Debug\MySql.Data.dll
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\bin\Debug\Newtonsoft.Json.dll
+C:\Users\fora\Documents\Visual Studio 2017\Projects\ConsoleApp\ConsoleApp\bin\Debug\Newtonsoft.Json.xml
