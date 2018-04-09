@@ -26,7 +26,7 @@ class Server():
         print('Server > running on {}:{}'.format(ip, port))
     
     # Отдельный поток обработки данных для клиента
-    def data_thread(self, client_socket, client_addres):
+    def data_thread(self, client_socket, client_address):
         storage = Storage()
         # Цикл считывания данных от клиента через его client_socket
         while True:
@@ -87,25 +87,25 @@ class Server():
         while True:
             try:
                 # Получаем сокет и адресс (ip, port) клиента, который подключился
-                client_socket, client_addres = self.server_socket.accept()
+                client_socket, client_address = self.server_socket.accept()
 
                 # Если клиента еще нет в списке онлайн клиентов - добавляем его
-                if client_addres not in self.clients:
-                    self.clients[client_addres] = client_socket
+                if client_address not in self.clients:
+                    self.clients[client_address] = client_socket
                     print(self.clients)
-                    print('{}:{} connected.'.format(client_addres[0], client_addres[1]))
+                    print('{}:{} connected.'.format(client_address[0], client_address[1]))
 
                 # Запускаем новый поток для обработки данных клиента
-                threading.Thread(target=self.data_thread, args=(client_socket, client_addres)).start()
+                threading.Thread(target=self.data_thread, args=(client_socket, client_address)).start()
 
             # При разрыве соединения с сокетом клиента
             except Exception as e:
                 client_socket.close()
                 try:
-                    del self.clients[client_addres]
+                    del self.clients[client_address]
                 except KeyError:
                     pass
-                print('{}:{} disconnected.'.format(client_addres[0], client_addres[1]))
+                print('{}:{} disconnected.'.format(client_address[0], client_address[1]))
 
                 print(e)
     
