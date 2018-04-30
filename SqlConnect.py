@@ -214,7 +214,7 @@ class SqlConnection:
 
     def InitializeUserAccountData (self, login, id, mainTeamNames):
         buf = json.JSONEncoder().encode (mainTeamNames)
-        query = "INSERT INTO useraccountdata(id, login, gold, experience, energy, rating, mainTeam) VALUES({id},{login},{gold},{exp},{energy},{rating},{team})".format(id= id, login= login, gold= 0, exp= 0, energy= 100, rating= 0, team= buf )
+        query = "INSERT INTO useraccountdata(id, login, gold, experience, energy, rating, mainTeam) VALUES('{id}','{login}',{gold},{exp},{energy},{rating},'{team}')".format(id= id, login= login, gold= 0, exp= 0, energy= 100, rating= 0, team= buf )
         print(query)
 
         try:
@@ -273,4 +273,4 @@ class SqlConnection:
 
 if __name__ == '__main__':
     db = SqlConnection()
-    db.registerUser('root', 'toor', 'none', '')
+    db.registerUser('root3', 'toor', 'none3', '')
