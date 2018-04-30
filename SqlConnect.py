@@ -24,14 +24,18 @@ class SqlConnection:
             self.settings = json.load(json_file)
     
     def setServerSetting(self, inputKey, value):
-        
+        print(self.settings)
+        print(inputKey)
         with open(self.settingspath, 'r') as json_file:
             self.settings = json.load(json_file)
 
-        if self.settings.get(inputKey, False):
+        if (self.settings[inputKey] or self.settings[inputKey] == 0 ):
             self.settings[inputKey] = value
+            print("hui0",self.settings[inputKey])
+
         with open(self.settingspath, 'w') as json_file:
             json.dump(self.settings, json_file, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True)
+            print(self.settings)
                 
 
     # def getServerSetting(self, setting):
@@ -273,4 +277,4 @@ class SqlConnection:
 
 if __name__ == '__main__':
     db = SqlConnection()
-    db.registerUser('root3', 'toor', 'none3', '')
+    db.registerUser('root1233', 'toor3', 'none1233', '')
