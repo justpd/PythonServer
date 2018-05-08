@@ -99,3 +99,5 @@ ENV/
 
 # mypy
 .mypy_cache/
+not_a_salt.txt
+ebola.py
