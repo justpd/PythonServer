@@ -2,8 +2,14 @@ from Sender import *
 import base64
 import json
 from SqlConnect import SqlConnection
+from QuickPlaySession import Loby
+
+OnlinePlayers = {
+    
+}
 
 DB = SqlConnection()
+QuickPlayLobby = Loby()
 
         # S_ConfirmConnection = 606001,
         # S_ConfirmUserLogin = 606002,
@@ -44,8 +50,11 @@ def RequestUserLogin(socket, data):
     if (DB.loginUser(data['login'], data['password'])):
         userSession = DB.InitialazeUserSession(data['login'])
         print(data['login'] + ' logged in.')
-        print(userSession)
-        print(json.dumps(userSession)[1:-1])
+        try:
+            OnlinePlayers[data['login']]
+        except:
+            OnlinePlayers[data['login']] = socket
+
         SendData(socket, 606002, json.dumps(userSession)[1:-1])
         SendData(socket, 606009, json.dumps(
             DB.GetUserImage(data['login']))[1:-1])
@@ -61,9 +70,27 @@ def RequestUserAccountDataUpdate(socket, data):
     SendData(socket, 606008, json.dumps(userSession)[1:-1])
     SendData(socket, 606009, json.dumps(DB.GetUserImage(data['login']))[1:-1])
 
+        # private static void Handle_UserLogout(int index, byte[] data)
+        # {
+        #     PacketBuffer buffer = new PacketBuffer()
+        #     buffer.WriteBytes(data)
+        #     int packetNum = buffer.ReadInteger()
+        #     string msg = buffer.ReadString()
+        #     buffer.Dispose()
+
+        #     Console.WriteLine(msg + "logged out.")
+        #     ServerTCP.OnlineClients.Remove(msg)
+        # }
+
+
+def RequestUserLogout(socket, data):
+    print(data['login'] + ' gone offline.')
+    OnlinePlayers.pop(data['login'])
 
 def RequestEnterQuickPlay(socket, data):
-    pass
+    print(data['login'] + 'requested to enter quick play.')
+    userSession = DB.InitialazeUserSession(data['login'])
+    QuickPlayLobby.EnterQuery(userSession)
 
 
 def QuickPlayMoveData(socket, data):
@@ -76,6 +103,7 @@ def RequestUpdateImage(socket, data):
 
 
 keys = {
+    505000: RequestUserLogout,
     505001: ConfirmConnection,
     505002: RequestUserLogin,
     505003: RequestUserRegistration,
@@ -101,3 +129,9 @@ def HandleData(socket, key, size, data):
         keys[key](socket, jsonData)
     else:
         print(key)
+
+def DisconnectUser(socket):
+    for k, v in OnlinePlayers.items():
+        if (v == socket):
+            RequestUserLogout(socket, {'login': k})
+            break
