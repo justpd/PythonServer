@@ -249,7 +249,23 @@ class SqlConnection:
         except mysql.connector.Error as err:
             print("Something went wrong: {}".format(err))
 
-    def UpdateUserImage(self, login, b64str, scale):
+# public static void UpdateUserImage(UserImageData userImageData)
+# {
+#     string query = string.Format("UPDATE userimages SET b64str = '{1}', scale = {2} WHERE login = '{0}'", userImageData.login, userImageData.b64str, userImageData.scale)
+#     Console.WriteLine(query)
+#     try
+#     {
+#         MySqlCommand cmd = new MySqlCommand(query, sqlConnection)
+#         sqlConnection.Open()
+#         cmd.ExecuteNonQuery()
+#         sqlConnection.Close()
+#     }
+#     catch(System.Exception ex)
+#     {
+#         Console.WriteLine(ex)
+#     }
+# }
+    def UpdateUserImage(self, login):
         query = "UPDATE userimages SET b64str = '{1}', scale = {2} WHERE login = '{0}'".format(
             login, b64str, scale)
         print(query)
@@ -263,7 +279,7 @@ class SqlConnection:
             except mysql.connector.Error as err:
                 print("Something went wrong: {}".format(err))
             else:
-                conn.commit()
+                conn.commit()            
 
             cursor.close()
             conn.close()
