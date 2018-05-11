@@ -4,6 +4,8 @@ from deuces import Card
 from deuces import Deck
 from deuces import Evaluator
 
+from Sender import SendQuickPlaySessionInfo
+
 class Loby():
     def __init__(self):
         self.Clients = []
@@ -73,20 +75,61 @@ class Session:
             print(self.player_session_1['login'] + ' is dealer.')
             self.dealer = self.player_session_1
             self.current = self.player_session_2
-            self.current_hand = self.GetStarterHand(self.current)
-            self.SimulateMove(self.current_hand)
+            # self.current_hand = self.GetStarterHand(self.current)
+            # # self.SimulateMove(self.current_hand)
         else:
             print(cards_repr[-2:] + ' > ' + cards_repr[:2])
             print(self.player_session_2['login'] + ' is dealer.')
             self.dealer = self.player_session_2
             self.current = self.player_session_1
-            self.current_hand = self.GetStarterHand(self.current)
-            self.SimulateMove(self.current_hand)
+            # self.current_hand = self.GetStarterHand(self.current)
+            # # self.SimulateMove(self.current_hand)
         
+        imageData = GetImageData(self.current['login'])
+        first_dealerCard = ''
+        second_dealerCard = ''
+        if (self.dealer['login'] == self.player_session_1['login']):
+            first_dealerCard = cards[0]
+            second_dealerCard = cards[1]
+        else:
+            first_dealerCard = cards[1]
+            second_dealerCard = cards[0]
+
+        sessioninfo = {
+            'roomId': self.roomID,
+            'name': 'OFC HEADSUP (500 chips)',
+            'point': self.levels[0],
+            'chips': self.chips,
+            
+            'dealer': True,
+            'enemyImage': imageData['b64str'],
+            'enemyImageScale': imageData['scale'],
+            'opponentName': self.current['login'],
+            'opponentRating': self.current['rating'],
+            'myDealerCard': first_dealerCard,
+            'oppDealerCard': second_dealerCard,
+        }
+
+        SendQuickPlaySessionInfo(GetPlayerSocket(self.dealer['login']), sessioninfo)
+
+        imageData = GetImageData(self.dealer['login'])
+        sessioninfo = {
+            'roomId': self.roomID,
+            'name': 'OFC HEADSUP (500 chips)',
+            'point': self.levels[0],
+            'chips': self.chips,
+
+            'dealer': False,
+            'enemyImage': imageData['b64str'],
+            'enemyImageScale': imageData['scale'],
+            'opponentName': self.dealer['login'],
+            'opponentRating': self.dealer['rating'],
+            'myDealerCard': second_dealerCard,
+            'oppDealerCard': first_dealerCard,
+        }
+
+        SendQuickPlaySessionInfo(GetPlayerSocket(self.current['login']), sessioninfo)
         
-        
-        hand = self.GetStarterHand(self.dealer)
-        self.SimulateMove(hand)
     
     def SimulateMove(self, hand):
         hand = hand.split('  ')
