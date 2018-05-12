@@ -276,6 +276,24 @@ class Session:
 
         SendQuickPlaySessionInfo(GetPlayerSocket(
             self.current['login']), sessioninfo)
+        
+        self.DrawNewHand(True)
+    
+    def DrawNewHand(self, firstHand):
+        self.current_hand = self.GetStarterHand(self.current)
+        sessionData = {
+            'roomId': self.roomID,
+            'firsthHand': firstHand,
+            'hand': self.current_hand
+        }
+        SendQuickPlaySessionData(GetPlayerSocket(
+            self.current['login']), sessionData)
+        
+        if (firstHand):
+            SendQuickPlaySessionData(GetPlayerSocket(
+                self.dealer['login']), sessionData)
+        
+
 
     def SimulateMove(self, hand):
         hand = hand.split('  ')
@@ -289,7 +307,7 @@ class Session:
         hand = self.deck.draw(5)
 
         hand_repr = Card.return_string_cards(hand).replace(
-            '[', '').replace(']', '').replace(' ', '').replace(',', '  ').strip()
+            '[', '').replace(']', '').replace(' ', '').strip()
 
         hand_repr_b = Card.return_pretty_cards(hand).replace('T', '10').replace(
             '[', '').replace(']', '').replace(' ', '').replace(',', '  ').strip()
