@@ -1,6 +1,7 @@
 from Sender import *
 import base64
 import json
+import time
 import threading
 
 from deuces import Card
@@ -14,7 +15,7 @@ class Loby():
         self.Clients = []
         self.Sessions = {}
         self.roomID = 0
-        threading.Thread(target=self.LobbyThread).start()
+        threading.Thread(target=self.LobyThread).start()
 
     def EnterQuery(self, usersession):
         self.Clients.append(usersession)
@@ -28,7 +29,7 @@ class Loby():
     #     self.Clients.sort(key=lambda x: x['rating'], reverse=True)
     #     print(self.Clients)
 
-    def LobbyThread(self):
+    def LobyThread(self):
         while True:
             if (len(self.Clients) > 1):
                 # self.SortByRating()
@@ -43,30 +44,29 @@ OnlinePlayers = {
 }
 
 DB = SqlConnection()
-QuickPlayLobby = Loby()
+QuickPlayLoby = Loby()
 
-        # S_ConfirmConnection = 606001,
-        # S_ConfirmUserLogin = 606002,
-        # S_AbortUserLogin = 606003,
-        # S_ConfirmUserRegistration = 606004,
-        # S_AbortUserRegistration = 606005,
-        # S_SendQuickPlaySessionInfo = 606006,
-        # S_SendQuickPlaySessionData = 606007,
-        # S_UpdateUserSessionData = 606008,
-        # S_UpdateUserImage = 606009
+# S_ConfirmConnection = 606001,
+# S_ConfirmUserLogin = 606002,
+# S_AbortUserLogin = 606003,
+# S_ConfirmUserRegistration = 606004,
+# S_AbortUserRegistration = 606005,
+# S_SendQuickPlaySessionInfo = 606006,
+# S_SendQuickPlaySessionData = 606007,
+# S_UpdateUserSessionData = 606008,
+# S_UpdateUserImage = 606009
 
-        # C_RequestUserLogout = 505000,
-        # C_ConfirmConnection = 505001,
-        # C_RequestUserLogin = 505002,
-        # C_RequestUserRegistration = 505003,
-        # C_RequestUserAccountDataUpdate = 505004,
-        # C_RequestEnterQuickPlay = 505005,
-        # C_QuickPlayMoveData = 505006,
-        # C_RequestUpdateImage = 505007
+# C_RequestUserLogout = 505000,
+# C_ConfirmConnection = 505001,
+# C_RequestUserLogin = 505002,
+# C_RequestUserRegistration = 505003,
+# C_RequestUserAccountDataUpdate = 505004,
+# C_RequestEnterQuickPlay = 505005,
+# C_QuickPlayMoveData = 505006,
+# C_RequestUpdateImage = 505007
 
 def ConfirmConnection(socket, jsonData):
     SendData(socket, 606001, "Welcome to our server!")
-
 
 def RequestUserRegistration(socket, data):
     # DB.registerUser()
@@ -77,7 +77,6 @@ def RequestUserRegistration(socket, data):
         DB.SetDefaultUserImage(data['login'])
     else:
         SendData(socket, 606005, "Registration error.")
-
 
 def RequestUserLogin(socket, data):
     print(data)
@@ -97,7 +96,6 @@ def RequestUserLogin(socket, data):
         print('Login aborted.')
         SendData(socket, 606003, "Error.")
 
-
 def RequestUserAccountDataUpdate(socket, data):
     print(data)
     userSession = DB.InitialazeUserSession(data['login'])
@@ -116,7 +114,6 @@ def RequestUserAccountDataUpdate(socket, data):
         #     ServerTCP.OnlineClients.Remove(msg)
         # }
 
-
 def RequestUserLogout(socket, data):
     print(data['login'] + ' gone offline.')
     OnlinePlayers.pop(data['login'])
@@ -124,17 +121,19 @@ def RequestUserLogout(socket, data):
 def RequestEnterQuickPlay(socket, data):
     print(data['login'] + 'requested to enter quick play.')
     userSession = DB.InitialazeUserSession(data['login'])
-    QuickPlayLobby.EnterQuery(userSession)
-
+    QuickPlayLoby.EnterQuery(userSession)
 
 def QuickPlayMoveData(socket, data):
-    QuickPlayLobby.Sessions[data['roomId']].Move(data['position'])
+    QuickPlayLoby.Sessions[data['roomId']].Move(data['position'])
 
 def RequestUpdateImage(socket, data):
     print(data)
     DB.UpdateUserImage(data['login'], data['b64str'], data['scale'])
     print('Image updated')
 
+
+def RequestNewRound(socket,data):
+    QuickPlayLoby.Sessions[data['roomId']].SetReady(data['login'])
 
 keys = {
     505000: RequestUserLogout,
@@ -145,7 +144,7 @@ keys = {
     505005: RequestEnterQuickPlay,
     505006: QuickPlayMoveData,
     505007: RequestUpdateImage,
-
+    505010: RequestNewRound,
 }
 
 
@@ -185,20 +184,43 @@ class Session:
         self.player_session_2 = player_session_2[0]
         self.roomID = roomID
 
+        self.round = 0
+
+        self.ready_players = 0
+
         self.chips = 500
+        # TODO 10
         self.levels = [10, 20, 30, 40, 50, 60,
                        70, 80, 90, 100, 200, 300, 400, 500]
-        self.point = self.levels[0]
+        self.lvl = 0
+        self.point = self.levels[self.lvl]
 
         self.first_hand = OFCDeck()
         self.second_hand = OFCDeck()
+
+        self.player_chips_1 = self.chips
+        self.player_chips_2 = self.chips
+
+        self.player_chips = {
+            self.player_session_1['login']: self.player_chips_1,
+            self.player_session_2['login']: self.player_chips_2
+        }
 
         self.OFCDecks = {
             self.player_session_1['login']: self.first_hand,
             self.player_session_2['login']: self.second_hand
         }
 
+        self.winner = ''
+
         self.DefineDealer()
+    
+    def SetReady(self, login):
+        self.ready_players += 1
+        print(self.ready_players)
+        if (self.ready_players == 2):
+            self.NewHand()
+            self.ready_players = 0
 
     def DefineDealer(self):
         self.deck = Deck()
@@ -302,6 +324,7 @@ class Session:
         sessionData['myHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
         sessionData['oppHandStr'] = self.OFCDecks[self.waiting['login']].GetHandStr()
         sessionData['oppHandRanks'] = self.OFCDecks[self.waiting['login']].GetHandRanks()
+        print(self.current['login'])
         SendQuickPlaySessionData(GetPlayerSocket(
             self.current['login']), sessionData)
         
@@ -310,7 +333,7 @@ class Session:
         sessionData['myHandRanks'] = self.OFCDecks[self.waiting['login']].GetHandRanks()
         sessionData['oppHandStr'] = self.OFCDecks[self.current['login']].GetHandStr()
         sessionData['oppHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
-
+        print(self.waiting['login'])
         SendQuickPlaySessionData(GetPlayerSocket(
             self.waiting['login']), sessionData)
 
@@ -345,7 +368,6 @@ class Session:
         SendQuickPlaySessionData(GetPlayerSocket(
             self.waiting['login']), sessionData)
 
-
     def SimulateMove(self, hand):
         hand = hand.split('  ')
         print(hand)
@@ -353,7 +375,6 @@ class Session:
             print('Place your cards:')
             position = input(card)
             self.OFCDecks[self.current['login']].Place(card, position)
-    
     
     def Move(self, positions):
         print(positions)
@@ -399,6 +420,81 @@ class Session:
             
             SendQuickPlaySessionData(GetPlayerSocket(
                 self.waiting['login']), sessionData)
+
+            score = self.OFCDecks[self.current['login']].CalculateScore(self.OFCDecks[self.waiting['login']])
+            self.player_chips[self.current['login']] += score * self.point
+            self.player_chips[self.waiting['login']] -= score * self.point
+
+            if (self.player_chips[self.current['login']] <= 0):
+                print("Game Over : winner is " + self.waiting['login'])
+                self.winner = self.waiting['login']
+                if (self.waiting['login'] == self.player_session_1['login']):
+                    self.player_session_1['experience'] += 70
+                    self.player_session_1['gold'] += 15
+                    self.player_session_1['rating'] += self.chips / 10
+                    self.player_session_2['experience'] += 30
+                    self.player_session_2['gold'] += 5
+                else:
+                    self.player_session_2['experience'] += 70
+                    self.player_session_2['gold'] += 15
+                    self.player_session_2['rating'] += self.chips / 10
+                    self.player_session_1['experience'] += 30
+                    self.player_session_1['gold'] += 5
+                
+                DB.UpdateUserSession(self.player_session_1)
+                DB.UpdateUserSession(self.player_session_2)
+                
+            elif (self.player_chips[self.waiting['login']] <= 0):
+                print("Game Over : winner is " + self.current['login'])
+                self.winner = self.current['login']
+
+                if (self.current['login'] == self.player_session_1['login']):
+                    self.player_session_1['experience'] += 70
+                    self.player_session_1['gold'] += 15
+                    self.player_session_1['rating'] += self.chips / 10
+                    self.player_session_2['experience'] += 30
+                    self.player_session_2['gold'] += 5
+                else:
+                    self.player_session_2['experience'] += 70
+                    self.player_session_2['gold'] += 15
+                    self.player_session_2['rating'] += self.chips / 10
+                    self.player_session_1['experience'] += 30
+                    self.player_session_1['gold'] += 5
+                
+                DB.UpdateUserSession(self.player_session_1)
+                DB.UpdateUserSession(self.player_session_2)
+
+            # TODO
+            # self.lvl += 1
+            # self.point = self.levels[self.lvl]
+            self.round += 1
+            if (self.round % 2 == 0):
+                self.lvl += 1
+                self.point = self.levels[self.lvl]
+
+            quickPlaySessionNewRound = {
+                'roomId': self.roomID,
+                'dealer': True,
+                'myScore': score,
+                'point': self.point,
+                'winner': self.winner,
+                'myBroken': self.OFCDecks[self.current['login']].dead,
+                'oppBroken': self.OFCDecks[self.waiting['login']].dead
+            }
+
+            print(self.current['login'])
+            SendQuickPlaySessionNewRound(GetPlayerSocket(
+                self.current['login']), quickPlaySessionNewRound)
+
+            print(self.waiting['login'])
+            quickPlaySessionNewRound['dealer'] = False
+            quickPlaySessionNewRound['myScore'] *= -1
+            quickPlaySessionNewRound['myBroken'], quickPlaySessionNewRound['oppBroken'] = quickPlaySessionNewRound['oppBroken'], quickPlaySessionNewRound['myBroken']
+            SendQuickPlaySessionNewRound(GetPlayerSocket(
+                self.waiting['login']), quickPlaySessionNewRound)
+            
+            if (self.winner != ''):
+                QuickPlayLoby.DestroySession(self)
             
         else:
             self.handIndex += 1
@@ -408,6 +504,21 @@ class Session:
             else:
                 self.DrawStarterHand(self.current_hand)
 
+    def NewHand(self):
+        self.deck = Deck()
+        self.first_hand = OFCDeck()
+        self.second_hand = OFCDeck()
+        self.OFCDecks = {
+            self.player_session_1['login']: self.first_hand,
+            self.player_session_2['login']: self.second_hand
+        }
+        self.handIndex = 0
+        self.lastPositions = ''
+        self.current_hand = ''
+        self.dealer = self.current
+        self.current, self.waiting = self.waiting, self.current
+        time.sleep(8)
+        self.DrawStarterHand('')
 
     def GetStarterHand(self, player_session):
         hand = self.deck.draw(5)
@@ -437,13 +548,6 @@ class Session:
 
         return hand_repr
 
-    # def __str__(self):
-    #     print('Session: {} vs {} id = {}'.format(
-    #         self.player_session_1['login'], self.player_session_2['login'], self.roomID))
-
-    def SendSessionInfo(self):
-        pass
-
 class OFCDeck():
     def __init__(self):
         self.top = ['--', '--', '--']
@@ -455,13 +559,56 @@ class OFCDeck():
         self.hands = [self.top, self.mid, self.bot, self.trunk]
 
         self.top_str = ''
+        self.top_score = 0
         self.top_rank = 0
         self.mid_str = ''
         self.mid_rank = 0
+        self.mid_score = 0
         self.bot_str = ''
+        self.bot_score = 0
         self.bot_rank = 0
 
+        self.dead = False
+
         self.evaluator = Evaluator()
+
+    def CalculateScore(self, opponentDeck):
+        score = 0
+        if (self.dead):
+            self.top_score = 0
+            self.mid_score = 0
+            self.bot_score = 0
+            if (opponentDeck.dead):
+                return 0
+            else:
+                score -= 6    
+                score -= opponentDeck.top_score
+                score -= opponentDeck.mid_score
+                score -= opponentDeck.bot_score
+                return score
+        else:
+            if (opponentDeck.dead):
+                score = self.top_score + self.mid_score + self.bot_score + 6
+                return score
+            else:
+                score = self.top_score + self.mid_score + self.bot_score - \
+                    opponentDeck.top_score - opponentDeck.mid_score - opponentDeck.bot_score
+                if (self.top_rank < opponentDeck.top_rank):
+                    score += 1
+                else:
+                    score -= 1
+
+                if (self.mid_rank < opponentDeck.mid_rank):
+                    score += 1
+                else:
+                    score -= 1
+
+                if (self.bot_rank < opponentDeck.bot_rank):
+                    score += 1
+                else:
+                    score -= 1
+
+                return score
 
     def Place(self, card, position):
         print('Placing: '+ card + ' at ' + position)
@@ -475,18 +622,23 @@ class OFCDeck():
         
         if (self.top_rank == 0):
             self.top_str, self.top_rank = self.CheckHand(self.top)
-            self.top_str = self.CheckCombination(self.top_str, self.top_rank, self.top)
+            self.top_str = self.CheckCombination(self.top_str, self.top_rank, self.top, 0)
             
         if (self.mid_rank == 0):
             self.mid_str, self.mid_rank = self.CheckHand(self.mid)
-            self.mid_str = self.CheckCombination(self.mid_str, self.mid_rank, self.mid)
+            self.mid_str = self.CheckCombination(self.mid_str, self.mid_rank, self.mid, 1)
 
         if (self.bot_rank == 0):
             self.bot_str, self.bot_rank = self.CheckHand(self.bot)
-            self.bot_str = self.CheckCombination(self.bot_str, self.bot_rank, self.bot)
+            self.bot_str = self.CheckCombination(self.bot_str, self.bot_rank, self.bot, 2)
 
         if (self.top_rank > 0 and self.mid_rank > 0 and self.bot_rank > 0):
             self.complete = True
+        
+            if (self.top_rank > self.mid_rank and self.mid_rank > self.bot_rank):
+                self.dead = False
+            else:
+                self.dead = True
     
     def GetHandStr(self):
         return [self.top_str,self.mid_str,self.bot_str]
@@ -494,25 +646,68 @@ class OFCDeck():
     def GetHandRanks(self):
         return [self.top_rank, self.mid_rank, self.bot_rank]
     
-    def CheckCombination(self, hand, rank, hand_values):
+    def CheckCombination(self, hand, rank, hand_values, hand_index):
         if (hand == 'High Card'):
             hand = self.CheckHighCard(hand, rank)
         elif (hand == 'Pair'):
-            hand = self.CheckPair(hand, rank)
+            hand = self.CheckPair(hand, rank, hand_index)
         elif (hand == 'Two Pair'):
             hand = self.CheckTwoPairs(hand, hand_values)
         elif (hand == 'Three of a Kind'):
-            hand = self.CheckThree(hand, rank)
+            hand = self.CheckThree(hand, rank, hand_index)
+            if (hand_index == 1):
+                hand += '2'
+                self.mid_score = 2
         elif (hand == 'Straight'):
             hand = self.CheckStraight(hand, hand_values)
+            if (hand_index == 1):
+                hand += '4'
+                self.mid_score = 4
+            elif (hand_index == 2):
+                hand += '2'
+                self.bot_score = 2
         elif (hand == 'Flush'):
             hand = self.CheckFlush(hand, hand_values)
+            if (hand_index == 1):
+                hand += '8'
+                self.mid_score = 8
+            elif (hand_index == 2):
+                hand += '4'
+                self.bot_score = 4
         elif (hand == 'Full House'):
             hand = self.CheckHouse(hand, hand_values)
+            if (hand_index == 1):
+                hand += '12'
+                self.mid_score = 12
+            elif (hand_index == 2):
+                hand += '6'
+                self.bot_score = 6
         elif (hand == 'Four of a Kind'):
             hand = self.CheckFour(hand, rank)
+            if (hand_index == 1):
+                hand += '20'
+                self.mid_score = 20
+            elif (hand_index == 2):
+                hand += '10'
+                self.bot_score = 10
         elif (hand == 'Straight Flush'):
-            hand = self.CheckStraight(hand, hand_values)
+            if (rank > 1):
+                hand = self.CheckStraight(hand, hand_values)
+                if (hand_index == 1):
+                    hand += '30'
+                    self.mid_score = 30
+                elif (hand_index == 2):
+                    hand += '15'
+                    self.bot_score = 15
+            else:
+                hand = 'Royal Flush.'
+                if (hand_index == 1):
+                    hand += '50'
+                    self.mid_score = 50
+                elif (hand_index == 2):
+                    hand += '25'
+                    self.bot_score = 25
+
         
         return hand
     
@@ -547,7 +742,9 @@ class OFCDeck():
         for value in hand_values_uniq:
             if (hand_values.count(value) == 2):
                 hand += ' ' + names[values.index(value)]
-            elif (hand_values.count(value) == 3):
+                break
+        for value in hand_values_uniq:
+            if (hand_values.count(value) == 3):
                 hand += ' Full of ' + names[values.index(value)] + '.'
         
         return hand
@@ -656,7 +853,7 @@ class OFCDeck():
 
         return hand
 
-    def CheckPair(self, hand, rank):
+    def CheckPair(self, hand, rank, index):
         if (rank > 5965):
             hand += ' of Deuces.'
         elif (rank > 5745):
@@ -667,52 +864,118 @@ class OFCDeck():
             hand += ' of Fives.'
         elif (rank > 5085):
             hand += ' of Sixes.'
+            if (index == 0):
+                hand += '1'
+                self.top_score = 1 
         elif (rank > 4865):
             hand += ' of Sevens.'
+            if (index == 0):
+                hand += '2'
+                self.top_score = 2 
         elif (rank > 4645):
             hand += ' of Eights.'
+            if (index == 0):
+                hand += '3'
+                self.top_score = 3 
         elif (rank > 4425):
             hand += ' of Nines.'
+            if (index == 0):
+                hand += '4'
+                self.top_score = 4 
         elif (rank > 4205):
             hand += ' of Tens.'
+            if (index == 0):
+                hand += '5'
+                self.top_score = 5 
         elif (rank > 3985):
             hand += ' of Jacks.'
+            if (index == 0):
+                hand += '6'
+                self.top_score = 6 
         elif (rank > 3765):
             hand += ' of Queens.'
+            if (index == 0):
+                hand += '7'
+                self.top_score = 7 
         elif (rank > 3545):
             hand += ' of Kings.'
+            if (index == 0):
+                hand += '8'
+                self.top_score = 8 
         else:
             hand += ' of Aces.'
+            if (index == 0):
+                hand += '9'
+                self.top_score = 9 
         
         return hand
     
-    def CheckThree(self, hand, rank):
+    def CheckThree(self, hand, rank, index):
         if (rank > 2401):
             hand += ' Deuces.'
+            if (index == 0):
+                hand += '10'
+                self.top_score = 10 
         elif (rank > 2335):
             hand += ' Threes.'
+            if (index == 0):
+                hand += '11'
+                self.top_score = 11 
         elif (rank > 2269):
             hand += ' Fours.'
+            if (index == 0):
+                hand += '12'
+                self.top_score = 12 
         elif (rank > 2203):
             hand += ' Fives.'
+            if (index == 0):
+                hand += '13'
+                self.top_score = 13 
         elif (rank > 2137):
             hand += ' Sixes.'
+            if (index == 0):
+                hand += '14'
+                self.top_score = 14 
         elif (rank > 2071):
             hand += ' Sevens.'
+            if (index == 0):
+                hand += '15'
+                self.top_score = 15 
         elif (rank > 2005):
             hand += ' Eights.'
+            if (index == 0):
+                hand += '16'
+                self.top_score = 16 
         elif (rank > 1939):
             hand += ' Nines.'
+            if (index == 0):
+                hand += '17'
+                self.top_score = 17 
         elif (rank > 1873):
             hand += ' Tens.'
+            if (index == 0):
+                hand += '18'
+                self.top_score = 18 
         elif (rank > 1807):
             hand += ' Jacks.'
+            if (index == 0):
+                hand += '19'
+                self.top_score = 19 
         elif (rank > 1741):
             hand += ' Queens.'
+            if (index == 0):
+                hand += '20'
+                self.top_score = 20 
         elif (rank > 1675):
             hand += ' Kings.'
+            if (index == 0):
+                hand += '21'
+                self.top_score = 21 
         else:
             hand += ' Aces.'
+            if (index == 0):
+                hand += '22'
+                self.top_score = 22 
         
         return hand
 

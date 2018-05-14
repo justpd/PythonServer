@@ -270,6 +270,27 @@ class SqlConnection:
         except mysql.connector.Error as err:
             print("Something went wrong: {}".format(err))
     
+    def UpdateUserSession(self, session):
+        query = "UPDATE useraccountdata SET gold = '{1}', experience = {2}, rating = {3} WHERE login = '{0}'".format(
+            session['login'], session['gold'], session['experience'], session['rating'])
+        print(query)
+
+        try:
+            conn = mysql.connector.connect(**self.config)
+            cursor = conn.cursor(buffered=True)
+
+            try:
+                cursor.execute(query)
+            except mysql.connector.Error as err:
+                print("Something went wrong: {}".format(err))
+            else:
+                conn.commit()
+
+            cursor.close()
+            conn.close()
+        except mysql.connector.Error as err:
+            print("Something went wrong: {}".format(err))
+    
     def GetUserImage(self, login):
         query = "SELECT * FROM userimages WHERE login = '{}'".format(
             login)

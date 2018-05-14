@@ -14,3 +14,7 @@ def SendQuickPlaySessionData(socket, sessionData):
     print(json.dumps(sessionData))
     SendData(socket, 606007, json.dumps(sessionData))
 
+
+def SendQuickPlaySessionNewRound(socket, sessionData):
+    print(json.dumps(sessionData))
+    SendData(socket, 606010, json.dumps(sessionData))
