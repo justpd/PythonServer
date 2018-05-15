@@ -79,7 +79,7 @@ def RequestUserRegistration(socket, data):
         SendData(socket, 606005, "Registration error.")
 
 def RequestUserLogin(socket, data):
-    print(data)
+    print('Requested user login : ', data)
     if (DB.loginUser(data['login'], data['password'])):
         userSession = DB.InitialazeUserSession(data['login'])
         print(data['login'] + ' logged in.')
@@ -124,7 +124,11 @@ def RequestEnterQuickPlay(socket, data):
     QuickPlayLoby.EnterQuery(userSession)
 
 def QuickPlayMoveData(socket, data):
-    QuickPlayLoby.Sessions[data['roomId']].Move(data['position'])
+    room = QuickPlayLoby.Sessions[data['roomId']]
+    if (room.fantasyHands[room.player_session_1['login']] or room.fantasyHands[room.player_session_2['login']]):
+        room.FantasyMove(data['position'], data['login'])
+    else:
+        room.Move(data['position'])
 
 def RequestUpdateImage(socket, data):
     print(data)
@@ -195,11 +199,19 @@ class Session:
         self.lvl = 0
         self.point = self.levels[self.lvl]
 
-        self.first_hand = OFCDeck()
-        self.second_hand = OFCDeck()
+        self.first_hand = OFCDeck(False)
+        self.second_hand = OFCDeck(False)
 
         self.player_chips_1 = self.chips
         self.player_chips_2 = self.chips
+
+        self.first_fantasy = False
+        self.second_fantasy = False
+
+        self.fantasyHands = {
+            self.player_session_1['login']: self.first_fantasy,
+            self.player_session_2['login']: self.second_fantasy
+        }
 
         self.player_chips = {
             self.player_session_1['login']: self.player_chips_1,
@@ -219,8 +231,12 @@ class Session:
         self.ready_players += 1
         print(self.ready_players)
         if (self.ready_players == 2):
-            self.NewHand()
+            if (self.fantasyHands[self.current['login']] or self.fantasyHands[self.waiting['login']]):
+                self.FantasyHand()
+            else:
+                self.NewHand()
             self.ready_players = 0
+            
 
     def DefineDealer(self):
         self.deck = Deck()
@@ -315,10 +331,10 @@ class Session:
             'hand': self.current_hand,
             'position': self.lastPositions,
             'opponentHand': opponentHand,
-            'myHandStr': '',
-            'myHandRanks': '',
-            'oppHandStr': '',
-            'oppHandRanks': '',
+            'myHandStr': ['', '', ''],
+            'myHandRanks': [0, 0, 0],
+            'oppHandStr': ['', '', ''],
+            'oppHandRanks': [0, 0, 0],
         }
         sessionData['myHandStr'] = self.OFCDecks[self.current['login']].GetHandStr()
         sessionData['myHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
@@ -346,10 +362,10 @@ class Session:
             'hand': self.current_hand,
             'position': self.lastPositions,
             'opponentHand': opponentHand,
-            'myHandStr': '',
-            'myHandRanks': '',
-            'oppHandStr': '',
-            'oppHandRanks': '',
+            'myHandStr': ['', '', ''],
+            'myHandRanks': [0, 0, 0],
+            'oppHandStr': ['', '', ''],
+            'oppHandRanks': [0, 0, 0],
         }
         sessionData['myHandStr'] = self.OFCDecks[self.current['login']].GetHandStr()
         sessionData['myHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
@@ -398,10 +414,10 @@ class Session:
                 'hand': '',
                 'position': self.lastPositions,
                 'opponentHand': self.current_hand,
-                'myHandStr': '',
-                'myHandRanks': '',
-                'oppHandStr': '',
-                'oppHandRanks': '',
+                'myHandStr': ['', '', ''],
+                'myHandRanks': [0, 0, 0],
+                'oppHandStr': ['', '', ''],
+                'oppHandRanks': [0, 0, 0],
             }
             sessionData['myHandStr'] = self.OFCDecks[self.current['login']].GetHandStr()
             sessionData['myHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
@@ -471,6 +487,9 @@ class Session:
             if (self.round % 2 == 0):
                 self.lvl += 1
                 self.point = self.levels[self.lvl]
+            
+            self.fantasyHands[self.current['login']] = self.OFCDecks[self.current['login']].CheckNextFantasy()
+            self.fantasyHands[self.waiting['login']] = self.OFCDecks[self.waiting['login']].CheckNextFantasy()
 
             quickPlaySessionNewRound = {
                 'roomId': self.roomID,
@@ -479,7 +498,11 @@ class Session:
                 'point': self.point,
                 'winner': self.winner,
                 'myBroken': self.OFCDecks[self.current['login']].dead,
-                'oppBroken': self.OFCDecks[self.waiting['login']].dead
+                'oppBroken': self.OFCDecks[self.waiting['login']].dead,
+                'myFantasy': self.fantasyHands[self.current['login']],
+                'oppFantasy': self.fantasyHands[self.waiting['login']],
+                'hand': '',
+                'oppHandStr': ''
             }
 
             print(self.current['login'])
@@ -490,6 +513,7 @@ class Session:
             quickPlaySessionNewRound['dealer'] = False
             quickPlaySessionNewRound['myScore'] *= -1
             quickPlaySessionNewRound['myBroken'], quickPlaySessionNewRound['oppBroken'] = quickPlaySessionNewRound['oppBroken'], quickPlaySessionNewRound['myBroken']
+            quickPlaySessionNewRound['myFantasy'], quickPlaySessionNewRound['oppFantasy'] = quickPlaySessionNewRound['oppFantasy'], quickPlaySessionNewRound['myFantasy']
             SendQuickPlaySessionNewRound(GetPlayerSocket(
                 self.waiting['login']), quickPlaySessionNewRound)
             
@@ -506,8 +530,8 @@ class Session:
 
     def NewHand(self):
         self.deck = Deck()
-        self.first_hand = OFCDeck()
-        self.second_hand = OFCDeck()
+        self.first_hand = OFCDeck(False)
+        self.second_hand = OFCDeck(False)
         self.OFCDecks = {
             self.player_session_1['login']: self.first_hand,
             self.player_session_2['login']: self.second_hand
@@ -517,8 +541,212 @@ class Session:
         self.current_hand = ''
         self.dealer = self.current
         self.current, self.waiting = self.waiting, self.current
-        time.sleep(8)
+        time.sleep(5)
         self.DrawStarterHand('')
+    
+    def FantasyHand(self):
+        self.deck = Deck()
+        self.first_hand = OFCDeck(self.fantasyHands[self.player_session_1['login']])
+        self.second_hand = OFCDeck(self.fantasyHands[self.player_session_2['login']])
+        self.OFCDecks = {
+            self.player_session_1['login']: self.first_hand,
+            self.player_session_2['login']: self.second_hand
+        }
+        self.handIndex = 0
+        self.lastPositions = ''
+        self.current_hand = ''
+        self.current, self.waiting = self.waiting, self.current
+
+        self.current_hands = {
+            self.player_session_1['login']: '',
+            self.player_session_2['login']: ''
+        }
+        self.looser = False
+        if (self.fantasyHands[self.player_session_1['login']]):
+            self.DrawFantasyHand(self.player_session_1['login'])
+        else:
+            self.looser = self.player_session_1
+        
+        if (self.fantasyHands[self.player_session_2['login']]):
+            self.DrawFantasyHand(self.player_session_2['login'])
+        else:
+            self.looser = self.player_session_2
+        
+        print('Looser: ', self.looser)
+
+        if (self.looser):
+            self.current_hands[self.looser['login']] = self.GetStarterHand(self.looser)
+            sessionData = {
+                'roomId': self.roomID,
+                'firstHand': True,
+                'myTurn': True,
+                'hand': self.current_hands[self.looser['login']],
+                'position': '',
+                'opponentHand': '',
+                'myHandStr': ['', '', ''],
+                'myHandRanks': [0, 0, 0],
+                'oppHandStr': ['', '', ''],
+                'oppHandRanks': [0, 0, 0],
+            }
+            sessionData['myHandStr'] = self.OFCDecks[self.looser['login']].GetHandStr()
+            sessionData['myHandRanks'] = self.OFCDecks[self.looser['login']].GetHandRanks()
+            print('Sending to :' + self.looser['login'])
+            SendQuickPlaySessionData(GetPlayerSocket(
+                self.looser['login']), sessionData)
+        time.sleep(5)
+    
+    def FantasyMove(self, positions, login):
+        print(positions)
+        pos = [''.join(i) for i in grouper(positions, 2)]
+        print(pos)
+        hand = self.current_hands[login].split(',')
+        i = 0
+        for card in hand:
+            self.OFCDecks[login].Place(card, pos[i])
+            i += 1
+        
+        if (login == self.looser['login']):
+            print('Looser moved.')
+            if (self.OFCDecks[login].complete):
+                sessionData = {
+                    'roomId': self.roomID,
+                    'firstHand': False,
+                    'myTurn': False,
+                    'hand': '',
+                    'position': '',
+                    'opponentHand': '',
+                    'myHandStr': ['', '', ''],
+                    'myHandRanks': [0, 0, 0],
+                    'oppHandStr': ['', '', ''],
+                    'oppHandRanks': [0, 0, 0],
+                }
+                sessionData['myHandStr'] = self.OFCDecks[login].GetHandStr()
+                sessionData['myHandRanks'] = self.OFCDecks[login].GetHandRanks()
+                SendQuickPlaySessionData(GetPlayerSocket(login), sessionData)
+            else:
+                self.current_hands[login] = self.GetHand()
+                sessionData = {
+                    'roomId': self.roomID,
+                    'firstHand': False,
+                    'myTurn': True,
+                    'hand': self.current_hands[login],
+                    'position': '',
+                    'opponentHand': '',
+                    'myHandStr': ['', '', ''],
+                    'myHandRanks': [0, 0, 0],
+                    'oppHandStr': ['', '', ''],
+                    'oppHandRanks': [0, 0, 0],
+                }
+                sessionData['myHandStr'] = self.OFCDecks[login].GetHandStr()
+                sessionData['myHandRanks'] = self.OFCDecks[login].GetHandRanks()
+                SendQuickPlaySessionData(GetPlayerSocket(login), sessionData)
+        else:
+            sessionData = {
+                'roomId': self.roomID,
+                'firstHand': False,
+                'myTurn': False,
+                'hand': '',
+                'position': '',
+                'opponentHand': '',
+                'myHandStr': ['', '', ''],
+                'myHandRanks': [0, 0, 0],
+                'oppHandStr': ['', '', ''],
+                'oppHandRanks': [0, 0, 0],
+            }
+            sessionData['myHandStr'] = self.OFCDecks[login].GetHandStr()
+            sessionData['myHandRanks'] = self.OFCDecks[login].GetHandRanks()
+            SendQuickPlaySessionData(GetPlayerSocket(login), sessionData)
+        
+        if (self.first_hand.complete and self.second_hand.complete):
+            score = self.OFCDecks[self.player_session_1['login']].CalculateScore(
+                self.OFCDecks[self.player_session_2['login']])
+            
+            self.player_chips[self.player_session_1['login']] += score * self.point
+            self.player_chips[self.player_session_2['login']] -= score * self.point
+
+            if (self.player_chips[self.player_session_1['login']] <= 0):
+                print("Game Over : winner is " + self.player_session_2['login'])
+                self.winner = self.player_session_2['login']
+
+                self.player_session_2['experience'] += 70
+                self.player_session_2['gold'] += 15
+                self.player_session_2['rating'] += self.chips / 10
+                self.player_session_1['experience'] += 30
+                self.player_session_1['gold'] += 5
+
+                DB.UpdateUserSession(self.player_session_1)
+                DB.UpdateUserSession(self.player_session_2)
+            elif (self.player_chips[self.player_session_2['login']] <= 0):
+                print("Game Over : winner is " + self.player_session_1['login'])
+                self.winner = self.player_session_1['login']
+
+                self.player_session_1['experience'] += 70
+                self.player_session_1['gold'] += 15
+                self.player_session_1['rating'] += self.chips / 10
+                self.player_session_2['experience'] += 30
+                self.player_session_2['gold'] += 5
+
+                DB.UpdateUserSession(self.player_session_1)
+                DB.UpdateUserSession(self.player_session_2)
+
+            self.fantasyHands[self.player_session_1['login']
+                              ] = self.OFCDecks[self.player_session_1['login']].CheckNextFantasy()
+            self.fantasyHands[self.player_session_2['login']
+                              ] = self.OFCDecks[self.player_session_2['login']].CheckNextFantasy()
+
+            quickPlaySessionNewRound = {
+                'roomId': self.roomID,
+                'dealer': True,
+                'myScore': score,
+                'point': self.point,
+                'winner': self.winner,
+                'myBroken': self.OFCDecks[self.player_session_1['login']].dead,
+                'oppBroken': self.OFCDecks[self.player_session_2['login']].dead,
+                'myFantasy': self.fantasyHands[self.player_session_1['login']],
+                'oppFantasy': self.fantasyHands[self.player_session_2['login']],
+                'hand': '',
+                'oppHandStr': ''
+            }
+
+            print(self.player_session_1['login'])
+            quickPlaySessionNewRound['oppHandStr'] = self.OFCDecks[self.player_session_2['login']].GetHandStr()
+            quickPlaySessionNewRound['hand'] = self.OFCDecks[self.player_session_2['login']].GetStringDeck()
+            SendQuickPlaySessionNewRound(GetPlayerSocket(
+                self.player_session_1['login']), quickPlaySessionNewRound)
+
+            print(self.player_session_2['login'])
+            quickPlaySessionNewRound['oppHandStr'] = self.OFCDecks[self.player_session_1['login']].GetHandStr()
+            quickPlaySessionNewRound['hand'] = self.OFCDecks[self.player_session_1['login']].GetStringDeck()
+            quickPlaySessionNewRound['dealer'] = False
+            quickPlaySessionNewRound['myScore'] *= -1
+            quickPlaySessionNewRound['myBroken'], quickPlaySessionNewRound[
+                'oppBroken'] = quickPlaySessionNewRound['oppBroken'], quickPlaySessionNewRound['myBroken']
+            quickPlaySessionNewRound['myFantasy'], quickPlaySessionNewRound[
+                'oppFantasy'] = quickPlaySessionNewRound['oppFantasy'], quickPlaySessionNewRound['myFantasy']
+            SendQuickPlaySessionNewRound(GetPlayerSocket(
+                self.player_session_2['login']), quickPlaySessionNewRound)
+
+            if (self.winner != ''):
+                QuickPlayLoby.DestroySession(self)
+
+    def DrawFantasyHand(self, login):
+        print('Drawing fantasy hand for: ' + login)
+        self.current_hands[login] = self.GetFantasyHand(login)
+        sessionData = {
+            'roomId': self.roomID,
+            'firstHand': True,
+            'myTurn': True,
+            'hand': self.current_hands[login],
+            'position': '',
+            'opponentHand': '',
+            'myHandStr': ['','',''],
+            'myHandRanks': [0, 0, 0],
+            'oppHandStr': ['', '', ''],
+            'oppHandRanks': [0, 0, 0],
+        }
+        SendQuickPlaySessionData(GetPlayerSocket(login), sessionData)
+
+        
 
     def GetStarterHand(self, player_session):
         hand = self.deck.draw(5)
@@ -548,8 +776,22 @@ class Session:
 
         return hand_repr
 
+    def GetFantasyHand(self, login):
+        hand = self.deck.draw(14)
+
+        hand_repr = Card.return_string_cards(hand).replace(
+            '[', '').replace(']', '').replace(' ', '').strip()
+
+        hand_repr_b = Card.return_pretty_cards(hand).replace('T', '10').replace(
+            '[', '').replace(']', '').replace(' ', '').replace(',', '  ').strip()
+
+        print('{}\'s cards: {}'.format(login, hand_repr))
+        print('{}\'s cards: {}'.format(login, hand_repr_b))
+
+        return hand_repr
+
 class OFCDeck():
-    def __init__(self):
+    def __init__(self, fantasy):
         self.top = ['--', '--', '--']
         self.mid = ['--', '--', '--', '--', '--']
         self.bot = ['--', '--', '--', '--', '--']
@@ -570,7 +812,27 @@ class OFCDeck():
 
         self.dead = False
 
+        self.fantasy = fantasy
+
         self.evaluator = Evaluator()
+    
+    def GetStringDeck(self):
+        return ','.join(self.hands[0]) + ',' + ','.join(self.hands[1]) + ',' + ','.join(self.hands[2])
+    
+    def CheckNextFantasy(self):
+        if (self.dead):
+            return False
+        else:
+            if (self.fantasy):
+                if (self.top_rank <= 2467 or self.bot_rank <= 166):
+                    return True
+                else:
+                    return False
+            else:
+                if (self.top_rank <= 3985):
+                    return True
+                else:
+                    return False
 
     def CalculateScore(self, opponentDeck):
         score = 0
@@ -635,7 +897,7 @@ class OFCDeck():
         if (self.top_rank > 0 and self.mid_rank > 0 and self.bot_rank > 0):
             self.complete = True
         
-            if (self.top_rank > self.mid_rank and self.mid_rank > self.bot_rank):
+            if (self.top_rank >= self.mid_rank and self.mid_rank >= self.bot_rank):
                 self.dead = False
             else:
                 self.dead = True
