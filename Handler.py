@@ -24,11 +24,6 @@ class Loby():
     def DestroySession(self, session):
         self.Sessions.pop(session.roomID)
 
-    # def SortByRating(self):
-    #     print(self.Clients)
-    #     self.Clients.sort(key=lambda x: x['rating'], reverse=True)
-    #     print(self.Clients)
-
     def LobyThread(self):
         while True:
             if (len(self.Clients) > 1):
@@ -135,7 +130,6 @@ def RequestUpdateImage(socket, data):
     DB.UpdateUserImage(data['login'], data['b64str'], data['scale'])
     print('Image updated')
 
-
 def RequestNewRound(socket,data):
     QuickPlayLoby.Sessions[data['roomId']].SetReady(data['login'])
 
@@ -150,7 +144,6 @@ keys = {
     505007: RequestUpdateImage,
     505010: RequestNewRound,
 }
-
 
 def HandleData(socket, key, size, data):
     addr = socket.getpeername()
@@ -173,10 +166,8 @@ def DisconnectUser(socket):
             RequestUserLogout(socket, {'login': k})
             break
 
-
 def GetImageData(login):
     return DB.GetUserImage(login)[0]
-
 
 def GetPlayerSocket(login):
     return OnlinePlayers[login]
@@ -237,7 +228,6 @@ class Session:
                 self.NewHand()
             self.ready_players = 0
             
-
     def DefineDealer(self):
         self.deck = Deck()
         cards = self.deck.draw(2)
@@ -252,6 +242,9 @@ class Session:
         print(cards_repr_b)
         print(cards)
 
+        #cheat deck
+        # self.deck = Deck(
+        #     'Qs,Qh,As,Ah,Td,6s,4s,3s,2s,Ts,Tc,8c,9c,Th,8h,9h,9d,9s,5h,8s,8d,5d,Kh,Ks,5c,Ac,Ad,5s,Jh,Js,4h,7c,7d,4d,6c,6d,6h,Jc,Jd,4c,3c,3d,3h,Kc,7s,7d,7c,7h,2c,2d,Kd,2h,Qc,Qd,Ac,Ad')
         self.deck = Deck()
 
         if (cards[0] > cards[1]):
@@ -557,6 +550,8 @@ class Session:
         self.current_hand = ''
         self.current, self.waiting = self.waiting, self.current
 
+        time.sleep(5)
+
         self.current_hands = {
             self.player_session_1['login']: '',
             self.player_session_2['login']: ''
@@ -604,8 +599,8 @@ class Session:
         for card in hand:
             self.OFCDecks[login].Place(card, pos[i])
             i += 1
-        
-        if (login == self.looser['login']):
+
+        if (self.looser and login == self.looser['login']):
             print('Looser moved.')
             if (self.OFCDecks[login].complete):
                 sessionData = {
@@ -744,9 +739,7 @@ class Session:
             'oppHandStr': ['', '', ''],
             'oppHandRanks': [0, 0, 0],
         }
-        SendQuickPlaySessionData(GetPlayerSocket(login), sessionData)
-
-        
+        SendQuickPlaySessionData(GetPlayerSocket(login), sessionData)  
 
     def GetStarterHand(self, player_session):
         hand = self.deck.draw(5)
@@ -1299,7 +1292,6 @@ class OFCDeck():
                 self.evaluator.get_rank_class(hand_score))
 
         return hand_class, hand_score
-
 
 def grouper(iterable, n):
     args = [iter(iterable)] * n
