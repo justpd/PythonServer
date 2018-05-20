@@ -30,7 +30,7 @@ class Loby():
                 # self.SortByRating()
                 self.roomID += 1
                 session = Session(
-                    self.Clients[0], self.Clients[1], self.roomID)
+                    self.Clients[0], self.Clients[1], self.roomID, 500)
                 self.Sessions[session.roomID] = session
                 self.Clients = self.Clients[2:]
 
@@ -174,16 +174,18 @@ def GetPlayerSocket(login):
 
 
 class Session:
-    def __init__(self, player_session_1, player_session_2, roomID):
+    def __init__(self, player_session_1, player_session_2, roomID, chips):
         self.player_session_1 = player_session_1[0]
         self.player_session_2 = player_session_2[0]
         self.roomID = roomID
 
         self.round = 0
 
+        self.playing = False
+
         self.ready_players = 0
 
-        self.chips = 500
+        self.chips = chips
         # TODO 10
         self.levels = [10, 20, 30, 40, 50, 60,
                        70, 80, 90, 100, 200, 300, 400, 500]
@@ -276,7 +278,7 @@ class Session:
 
         sessioninfo = {
             'roomId': self.roomID,
-            'name': 'OFC HEADSUP (500 chips)',
+            'name': 'OFC HEADSUP ({} chips)'.format(self.chips),
             'point': self.levels[0],
             'chips': self.chips,
 
@@ -295,7 +297,7 @@ class Session:
         imageData = GetImageData(self.dealer['login'])
         sessioninfo = {
             'roomId': self.roomID,
-            'name': 'OFC HEADSUP (500 chips)',
+            'name': 'OFC HEADSUP ({} chips)'.format(self.chips),
             'point': self.levels[0],
             'chips': self.chips,
 
@@ -316,35 +318,38 @@ class Session:
         self.DrawStarterHand('')
     
     def DrawStarterHand(self, opponentHand):
-        self.current_hand = self.GetStarterHand(self.current)
-        sessionData = {
-            'roomId': self.roomID,
-            'firstHand': True,
-            'myTurn': True,
-            'hand': self.current_hand,
-            'position': self.lastPositions,
-            'opponentHand': opponentHand,
-            'myHandStr': ['', '', ''],
-            'myHandRanks': [0, 0, 0],
-            'oppHandStr': ['', '', ''],
-            'oppHandRanks': [0, 0, 0],
-        }
-        sessionData['myHandStr'] = self.OFCDecks[self.current['login']].GetHandStr()
-        sessionData['myHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
-        sessionData['oppHandStr'] = self.OFCDecks[self.waiting['login']].GetHandStr()
-        sessionData['oppHandRanks'] = self.OFCDecks[self.waiting['login']].GetHandRanks()
-        print(self.current['login'])
-        SendQuickPlaySessionData(GetPlayerSocket(
-            self.current['login']), sessionData)
+        if (not self.playing):
+            self.current_hand = self.GetStarterHand(self.current)
+            sessionData = {
+                'roomId': self.roomID,
+                'firstHand': True,
+                'myTurn': True,
+                'hand': self.current_hand,
+                'position': self.lastPositions,
+                'opponentHand': opponentHand,
+                'myHandStr': ['', '', ''],
+                'myHandRanks': [0, 0, 0],
+                'oppHandStr': ['', '', ''],
+                'oppHandRanks': [0, 0, 0],
+            }
+            sessionData['myHandStr'] = self.OFCDecks[self.current['login']].GetHandStr()
+            sessionData['myHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
+            sessionData['oppHandStr'] = self.OFCDecks[self.waiting['login']].GetHandStr()
+            sessionData['oppHandRanks'] = self.OFCDecks[self.waiting['login']].GetHandRanks()
+            print(self.current['login'])
+            SendQuickPlaySessionData(GetPlayerSocket(
+                self.current['login']), sessionData)
+
+            sessionData['myTurn'] = False
+            sessionData['myHandStr'] = self.OFCDecks[self.waiting['login']].GetHandStr()
+            sessionData['myHandRanks'] = self.OFCDecks[self.waiting['login']].GetHandRanks()
+            sessionData['oppHandStr'] = self.OFCDecks[self.current['login']].GetHandStr()
+            sessionData['oppHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
+            print(self.waiting['login'])
+            SendQuickPlaySessionData(GetPlayerSocket(
+                self.waiting['login']), sessionData)
         
-        sessionData['myTurn'] = False
-        sessionData['myHandStr'] = self.OFCDecks[self.waiting['login']].GetHandStr()
-        sessionData['myHandRanks'] = self.OFCDecks[self.waiting['login']].GetHandRanks()
-        sessionData['oppHandStr'] = self.OFCDecks[self.current['login']].GetHandStr()
-        sessionData['oppHandRanks'] = self.OFCDecks[self.current['login']].GetHandRanks()
-        print(self.waiting['login'])
-        SendQuickPlaySessionData(GetPlayerSocket(
-            self.waiting['login']), sessionData)
+            self.playing = True
 
     def DrawNewHand(self, opponentHand):
         self.current_hand = self.GetHand()
@@ -429,6 +434,8 @@ class Session:
             
             SendQuickPlaySessionData(GetPlayerSocket(
                 self.waiting['login']), sessionData)
+            
+            self.playing = False
 
             score = self.OFCDecks[self.current['login']].CalculateScore(self.OFCDecks[self.waiting['login']])
             self.player_chips[self.current['login']] += score * self.point
@@ -438,17 +445,15 @@ class Session:
                 print("Game Over : winner is " + self.waiting['login'])
                 self.winner = self.waiting['login']
                 if (self.waiting['login'] == self.player_session_1['login']):
-                    self.player_session_1['experience'] += 70
+                    self.player_session_1['experience'] += 5
                     self.player_session_1['gold'] += 15
                     self.player_session_1['rating'] += self.chips / 10
-                    self.player_session_2['experience'] += 30
-                    self.player_session_2['gold'] += 5
+                    self.player_session_2['experience'] += 1
                 else:
-                    self.player_session_2['experience'] += 70
+                    self.player_session_2['experience'] += 5
                     self.player_session_2['gold'] += 15
                     self.player_session_2['rating'] += self.chips / 10
-                    self.player_session_1['experience'] += 30
-                    self.player_session_1['gold'] += 5
+                    self.player_session_1['experience'] += 1
                 
                 DB.UpdateUserSession(self.player_session_1)
                 DB.UpdateUserSession(self.player_session_2)
@@ -458,17 +463,15 @@ class Session:
                 self.winner = self.current['login']
 
                 if (self.current['login'] == self.player_session_1['login']):
-                    self.player_session_1['experience'] += 70
+                    self.player_session_1['experience'] += 5
                     self.player_session_1['gold'] += 15
                     self.player_session_1['rating'] += self.chips / 10
-                    self.player_session_2['experience'] += 30
-                    self.player_session_2['gold'] += 5
+                    self.player_session_2['experience'] += 1
                 else:
-                    self.player_session_2['experience'] += 70
+                    self.player_session_2['experience'] += 5
                     self.player_session_2['gold'] += 15
                     self.player_session_2['rating'] += self.chips / 10
-                    self.player_session_1['experience'] += 30
-                    self.player_session_1['gold'] += 5
+                    self.player_session_1['experience'] += 1
                 
                 DB.UpdateUserSession(self.player_session_1)
                 DB.UpdateUserSession(self.player_session_2)
@@ -557,19 +560,24 @@ class Session:
             self.player_session_2['login']: ''
         }
         self.looser = False
-        if (self.fantasyHands[self.player_session_1['login']]):
+
+        if (self.fantasyHands[self.player_session_1['login']] and not self.playing):
             self.DrawFantasyHand(self.player_session_1['login'])
-        else:
+        elif (not self.playing):
             self.looser = self.player_session_1
-        
-        if (self.fantasyHands[self.player_session_2['login']]):
-            self.DrawFantasyHand(self.player_session_2['login'])
         else:
+            print('BUG')
+        
+        if (self.fantasyHands[self.player_session_2['login']] and not self.playing):
+            self.DrawFantasyHand(self.player_session_2['login'])
+        elif (not self.playing):
             self.looser = self.player_session_2
+        else:
+            print('BUG')
         
         print('Looser: ', self.looser)
 
-        if (self.looser):
+        if (self.looser and not self.playing):
             self.current_hands[self.looser['login']] = self.GetStarterHand(self.looser)
             sessionData = {
                 'roomId': self.roomID,
@@ -659,15 +667,16 @@ class Session:
             self.player_chips[self.player_session_1['login']] += score * self.point
             self.player_chips[self.player_session_2['login']] -= score * self.point
 
+            self.playing = False
+
             if (self.player_chips[self.player_session_1['login']] <= 0):
                 print("Game Over : winner is " + self.player_session_2['login'])
                 self.winner = self.player_session_2['login']
 
-                self.player_session_2['experience'] += 70
+                self.player_session_2['experience'] += 5
                 self.player_session_2['gold'] += 15
                 self.player_session_2['rating'] += self.chips / 10
                 self.player_session_1['experience'] += 30
-                self.player_session_1['gold'] += 5
 
                 DB.UpdateUserSession(self.player_session_1)
                 DB.UpdateUserSession(self.player_session_2)
@@ -675,11 +684,10 @@ class Session:
                 print("Game Over : winner is " + self.player_session_1['login'])
                 self.winner = self.player_session_1['login']
 
-                self.player_session_1['experience'] += 70
+                self.player_session_1['experience'] += 5
                 self.player_session_1['gold'] += 15
                 self.player_session_1['rating'] += self.chips / 10
-                self.player_session_2['experience'] += 30
-                self.player_session_2['gold'] += 5
+                self.player_session_2['experience'] += 1
 
                 DB.UpdateUserSession(self.player_session_1)
                 DB.UpdateUserSession(self.player_session_2)
@@ -725,21 +733,23 @@ class Session:
                 QuickPlayLoby.DestroySession(self)
 
     def DrawFantasyHand(self, login):
-        print('Drawing fantasy hand for: ' + login)
-        self.current_hands[login] = self.GetFantasyHand(login)
-        sessionData = {
-            'roomId': self.roomID,
-            'firstHand': True,
-            'myTurn': True,
-            'hand': self.current_hands[login],
-            'position': '',
-            'opponentHand': '',
-            'myHandStr': ['','',''],
-            'myHandRanks': [0, 0, 0],
-            'oppHandStr': ['', '', ''],
-            'oppHandRanks': [0, 0, 0],
-        }
-        SendQuickPlaySessionData(GetPlayerSocket(login), sessionData)  
+        if (not self.playing):
+            print('Drawing fantasy hand for: ' + login)
+            self.current_hands[login] = self.GetFantasyHand(login)
+            sessionData = {
+                'roomId': self.roomID,
+                'firstHand': True,
+                'myTurn': True,
+                'hand': self.current_hands[login],
+                'position': '',
+                'opponentHand': '',
+                'myHandStr': ['','',''],
+                'myHandRanks': [0, 0, 0],
+                'oppHandStr': ['', '', ''],
+                'oppHandRanks': [0, 0, 0],
+            }
+            SendQuickPlaySessionData(GetPlayerSocket(login), sessionData)
+            self.playing = True
 
     def GetStarterHand(self, player_session):
         hand = self.deck.draw(5)
