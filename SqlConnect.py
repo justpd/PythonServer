@@ -129,6 +129,8 @@ class SqlConnection:
                     cursor.execute(query)
                 except mysql.connector.Error as err:
                     print("Something went wrong: {}".format(err))
+                    cursor.close()
+                    conn.close()
                 else:
                     conn.commit()            
                     print("New user joined: " + login)
@@ -203,6 +205,8 @@ class SqlConnection:
                 cursor.execute(query)
             except mysql.connector.Error as err:
                 print("Something went wrong: {}".format(err))
+                cursor.close()
+                conn.close()
             else:
                 conn.commit()            
 
@@ -223,6 +227,8 @@ class SqlConnection:
                 cursor.execute(query)
             except mysql.connector.Error as err:
                 print("Something went wrong: {}".format(err))
+                cursor.close()
+                conn.close()
             else:
                 conn.commit()            
 
@@ -262,6 +268,8 @@ class SqlConnection:
                 cursor.execute(query)
             except mysql.connector.Error as err:
                 print("Something went wrong: {}".format(err))
+                cursor.close()
+                conn.close()
             else:
                 conn.commit()
 
@@ -283,6 +291,8 @@ class SqlConnection:
                 cursor.execute(query)
             except mysql.connector.Error as err:
                 print("Something went wrong: {}".format(err))
+                cursor.close()
+                conn.close()
             else:
                 conn.commit()
 
@@ -323,6 +333,8 @@ class SqlConnection:
                 cursor.execute(query)
             except mysql.connector.Error as err:
                 print("Something went wrong: {}".format(err))
+                cursor.close()
+                conn.close()
             else:
                 conn.commit()
 
