@@ -910,20 +910,30 @@ class OFCDeck():
             else:
                 score = self.top_score + self.mid_score + self.bot_score - \
                     opponentDeck.top_score - opponentDeck.mid_score - opponentDeck.bot_score
-                if (self.top_rank < opponentDeck.top_rank):
-                    score += 1
+                
+                top_winner = self.top_rank < opponentDeck.top_rank
+                mid_winner = self.mid_rank < opponentDeck.mid_rank
+                bot_winner = self.bot_rank < opponentDeck.bot_rank
+                
+                if (top_winner and mid_winner and bot_winner):
+                    score += 6
+                elif (not top_winner and not mid_winner and not bot_winner):
+                    score -= 6
                 else:
-                    score -= 1
+                    if (top_winner):
+                        score += 1
+                    else:
+                        score -= 1
 
-                if (self.mid_rank < opponentDeck.mid_rank):
-                    score += 1
-                else:
-                    score -= 1
+                    if (mid_winner):
+                        score += 1
+                    else:
+                        score -= 1
 
-                if (self.bot_rank < opponentDeck.bot_rank):
-                    score += 1
-                else:
-                    score -= 1
+                    if (bot_winner):
+                        score += 1
+                    else:
+                        score -= 1
 
                 return score
 
